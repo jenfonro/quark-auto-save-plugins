@@ -105,26 +105,40 @@ class Alist_save_other_path:
             self.verify_path = task['addition']['alist_save_other_path']['target_path']
         #这里获取的设置中的保存目录、验证目录
         self.target_path = task['addition']['alist_save_other_path']['target_path']
-        verify_dir_list = self.get_path_list(self.verify_path)
-        #初始化alist中的夸克目录
-        self.source_path = f"{self.quark_path}{task['savepath']}"
-        #初始化任务名
-        self.taskname = f"{task['taskname']}"
-
-        source_dir_list = self.get_path_list(self.source_path)
-        print("网盘中的文件列表")
-        print(f"{source_dir_list}")
-        #比对需要复制的文件
-        print("待转存的文件列表")
-        self.get_save_file(verify_dir_list,source_dir_list)
-        print(f"{self.save_file_data}")
-        if self.save_file_data :
-            self.save_start(self.save_file_data)
-            print("转存的文件列表：")
-            for save_file in self.save_file_data:
-                print(f"└── 🎞️{save_file}")
+        #先验证目录是否存在，如果不存在则直接复制整个目录过去
+        Error_quit = False
+        if not self.get_path(self.target_path):
+            dir_exists = False
+            print('新建保存目标目录')
+            if not self.mkdir(self.target_path):
+                print('新建保存目标目录失败')
+                Error_quit = True
         else:
-            print("转存文件均已存在")
+            dir_exists = True
+        if not Error_quit:
+            if dir_exists:
+                verify_dir_list = self.get_path_list(self.verify_path)
+            #初始化alist中的夸克目录
+            self.source_path = f"{self.quark_path}{task['savepath']}"
+            #初始化任务名
+            self.taskname = f"{task['taskname']}"
+            source_dir_list = self.get_path_list(self.source_path)
+            print("网盘中的文件列表")
+            print(f"{source_dir_list}")
+            #比对需要复制的文件
+            if dir_exists:
+                self.get_save_file(verify_dir_list, source_dir_list)
+            else:
+                self.save_file_data = []
+                for source_list in source_dir_list:
+                    self.save_file_data.append(source_list['name'])
+            if self.save_file_data :
+                self.save_start(self.save_file_data)
+                print("转存的文件列表：")
+                for save_file in self.save_file_data:
+                    print(f"└── 🎞️{save_file}")
+            else:
+                print("转存文件均已存在")
 
 
     def save_start(self, save_file_data):
@@ -172,9 +186,29 @@ class Alist_save_other_path:
 
 
 
+    def mkdir(self, path):
+        url = f"{self.url}/api/fs/mkdir"
+        payload = json.dumps({
+            "path": path,
+        })
+        response = self._send_request("POST", url, data=payload)
+        if response.status_code != 200 or response.json()['message'] != "success" :
+            return False
+        else:
+            return True
 
-
-
+    def get_path(self, path):
+        url = f"{self.url}/api/fs/list"
+        payload = json.dumps({
+            "path": path,
+            "password": "",
+            "force_root": False
+        })
+        response = self._send_request("POST", url, data=payload)
+        if response.status_code != 200 or response.json()['message'] != "success" :
+            return False
+        else:
+            return True
 
     def get_path_list(self, path):
         url = f"{self.url}/api/fs/list"
